@@ -30,7 +30,10 @@ async function run() {
 
     const allDataCollection = client.db("craftedShotsDb").collection("alldata");
 
-    
+    app.get("/alldata", async (req, res) => {
+      const result = await allDataCollection.find().toArray();
+      res.send(result);
+    });
 
 
 
