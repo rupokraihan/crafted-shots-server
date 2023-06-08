@@ -29,9 +29,14 @@ async function run() {
 
 
     const allDataCollection = client.db("craftedShotsDb").collection("alldata");
+    const reviewCollection = client.db("craftedShotsDb").collection("reviews");
 
     app.get("/alldata", async (req, res) => {
       const result = await allDataCollection.find().toArray();
+      res.send(result);
+    });
+    app.get("/reviews", async (req, res) => {
+      const result = await reviewCollection.find().toArray();
       res.send(result);
     });
 
