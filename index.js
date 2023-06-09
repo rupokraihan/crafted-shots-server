@@ -8,8 +8,6 @@ const port = process.env.port || 5000;
 app.use(cors());
 app.use(express.json());
 
-
-
 const { MongoClient, ServerApiVersion } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.5ad6o2n.mongodb.net/?retryWrites=true&w=majority`;
 
@@ -27,9 +25,22 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
 
-
+    const usersCollection = client.db("craftedShotsDb").collection("users");
     const allDataCollection = client.db("craftedShotsDb").collection("alldata");
     const reviewCollection = client.db("craftedShotsDb").collection("reviews");
+
+    // users related apis
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      console.log(user);
+      const query = { email: user.email };
+      const existingUser = await usersCollection.findOne(query);
+      if (existingUser) {
+        return res.send({ message: "user already exists" });
+      }
+      const result = await usersCollection.insertOne(user);
+      res.send(result);
+    });
 
     app.get("/alldata", async (req, res) => {
       const result = await allDataCollection.find().toArray();
@@ -39,10 +50,6 @@ async function run() {
       const result = await reviewCollection.find().toArray();
       res.send(result);
     });
-
-
-
-
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
@@ -55,8 +62,6 @@ async function run() {
   }
 }
 run().catch(console.dir);
-
-
 
 app.get("/", (req, res) => {
   res.send("SERVER IS RUNNING");
