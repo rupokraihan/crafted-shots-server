@@ -9,6 +9,28 @@ const port = process.env.port || 5000;
 app.use(cors());
 app.use(express.json());
 
+const verifyJWT = (req, res, next) => {
+  const authorization = req.headers.authorization;
+  if (!authorization) {
+    return res
+      .status(401)
+      .send({ error: true, message: "unauthorized access" });
+  }
+
+  const token = authorization.split(" ")[1];
+
+  // verify a token symmetric
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+    if (err) {
+      return res
+        .status(401)
+        .send({ error: true, message: "unauthorized access" });
+    }
+    req.decoded = decoded;
+    next();
+  });
+};
+
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.5ad6o2n.mongodb.net/?retryWrites=true&w=majority`;
 
@@ -30,6 +52,14 @@ async function run() {
     const allDataCollection = client.db("craftedShotsDb").collection("alldata");
     const reviewCollection = client.db("craftedShotsDb").collection("reviews");
 
+    app.post("/jwt", (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "2h",
+      });
+      res.send({ token });
+    });
+
     // users related apis
 
     app.get("/users", async (req, res) => {
@@ -48,6 +78,15 @@ async function run() {
       const result = await usersCollection.insertOne(user);
       res.send(result);
     });
+
+    app.get("/users/admin/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      const result = { admin: user.role === "admin" };
+      res.send(result);
+    });
+
     // this is for admin role
     app.patch("/users/admin/:id", async (req, res) => {
       const id = req.params.id;
@@ -58,6 +97,14 @@ async function run() {
         },
       };
       const result = await usersCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
+
+    app.get("/users/instructor/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      const result = { instructor: user.role === "instructor" };
       res.send(result);
     });
 
@@ -75,7 +122,42 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/users/student/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      const result = { student: user.role != "admin" && user.role != "instructor" };
+      res.send(result);
+      
+    });
 
+    // this is for student role
+
+    app.patch("/users/student/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          role: "student",
+        },
+      };
+      const result = await usersCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
+
+    // add class
+    app.post("/alldata", verifyJWT, async (req, res) => {
+      const addItem = req.body;
+      const result = await allDataCollection.insertOne(req.body);
+      res.send(result);
+    });
+
+    // get class by email
+    app.get("/alldata/:email", async (req, res) => {
+      const result = await usersCollection
+        .find({ email: req.params.email }).toArray();
+      res.send(result)
+    })
 
 
 
