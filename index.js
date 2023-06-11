@@ -51,9 +51,13 @@ async function run() {
     const usersCollection = client.db("craftedShotsDb").collection("users");
     const allDataCollection = client.db("craftedShotsDb").collection("alldata");
     const reviewCollection = client.db("craftedShotsDb").collection("reviews");
+    const selectedClassCollection = client
+      .db("craftedShotsDb")
+      .collection("selectedclass");
 
     app.post("/jwt", (req, res) => {
       const user = req.body;
+      console.log(req);
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
         expiresIn: "2h",
       });
@@ -126,9 +130,10 @@ async function run() {
       const email = req.params.email;
       const query = { email: email };
       const user = await usersCollection.findOne(query);
-      const result = { student: user.role != "admin" && user.role != "instructor" };
+      const result = {
+        student: user.role != "admin" && user.role != "instructor",
+      };
       res.send(result);
-      
     });
 
     // this is for student role
@@ -155,11 +160,48 @@ async function run() {
     // get class by email
     app.get("/alldata/:email", async (req, res) => {
       const result = await usersCollection
-        .find({ email: req.params.email }).toArray();
-      res.send(result)
-    })
+        .find({ email: req.params.email })
+        .toArray();
+      res.send(result);
+    });
 
+    // update class data
+    app.patch("/updateclass/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          classTitle: req.body.classTitle,
+          courseFee: req.body.courseFee,
+        },
+      };
+      const result = await allDataCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
 
+    // selected Classes
+    app.post("/selectedclass", async (req, res) => {
+      const selectedClass = req.body;
+      const result = await selectedClassCollection.insertOne(selectedClass);
+      res.send(result);
+    });
+
+    app.get("/selectedmyclass", verifyJWT, async (req, res) => {
+      const email = req.query.email;
+      if (!email) {
+        res.send([]);
+      }
+      const decodedEmail = req.decoded.email;
+      if (email !== decodedEmail) {
+        return res
+          .status(403)
+          .send({ error: true, message: "forbidden access" });
+      }
+
+      const query = { email: email };
+      const result = await selectedClassCollection.find(query).toArray();
+      res.send(result);
+    });
 
     app.get("/alldata", async (req, res) => {
       const result = await allDataCollection.find().toArray();
