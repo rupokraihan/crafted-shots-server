@@ -3,6 +3,7 @@ const cors = require("cors");
 const app = express();
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
+const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY);
 const port = process.env.port || 5000;
 
 // middleware
@@ -51,6 +52,9 @@ async function run() {
     const usersCollection = client.db("craftedShotsDb").collection("users");
     const allDataCollection = client.db("craftedShotsDb").collection("alldata");
     const reviewCollection = client.db("craftedShotsDb").collection("reviews");
+    const paymentCollection = client
+      .db("craftedShotsDb")
+      .collection("payments");
     const selectedClassCollection = client
       .db("craftedShotsDb")
       .collection("selectedclass");
@@ -194,7 +198,7 @@ async function run() {
     });
 
     // deny classes
-    app.patch("/denyclass/:id", verifyJWT,  async (req, res) => {
+    app.patch("/denyclass/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const { feedback } = req.body;
       const filter = { _id: new ObjectId(id) };
@@ -247,6 +251,64 @@ async function run() {
     });
     app.get("/reviews", async (req, res) => {
       const result = await reviewCollection.find().toArray();
+      res.send(result);
+    });
+
+    app.post("/create-payment-intent", verifyJWT, async (req, res) => {
+      const { courseFee } = req.body;
+      const amount = parseInt(courseFee * 100);
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      });
+
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
+    });
+
+    // payment related API's Here
+
+    app.post("/payments", verifyJWT, async (req, res) => {
+      const payment = req.body;
+      const insertResult = await paymentCollection.insertOne(payment);
+
+      // update
+      const updateQuery = { _id: new ObjectId(payment.selectedClassId) };
+      const updatedSeat = { $inc: { availableSeats: -1 } };
+      const options = { upsert: true };
+      const updateResult = await allDataCollection.updateOne(
+        updateQuery,
+        updatedSeat,
+        options
+      );
+
+      // delete
+      const deleteQuery = { _id: new ObjectId(payment.classId) };
+      const deleteResult = await selectedClassCollection.deleteOne(deleteQuery);
+
+      res.send({ insertResult, deleteResult, updateResult });
+    });
+
+    // history and the newest payment will be at the top
+    app.get("/payments", verifyJWT, async (req, res) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const result = await paymentCollection
+        .find(query)
+        .sort({ date: -1 })
+        .toArray();
+      res.send(result);
+    });
+    // Enrolled Classes
+    app.get("/enrolled-classes", verifyJWT, async (req, res) => {
+      const email = req.query.email;
+      const query = { email: email };
+      const result = await paymentCollection
+        .find(query)
+        .sort({ date: -1 })
+        .toArray();
       res.send(result);
     });
 
