@@ -179,6 +179,35 @@ async function run() {
       res.send(result);
     });
 
+    // approve class
+    app.patch("/approvedclasses/:id", async (req, res) => {
+      const updateStatus = req.body;
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          status: updateStatus.status,
+        },
+      };
+      const result = await allDataCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
+
+    // deny classes
+    app.patch("/denyclass/:id", verifyJWT,  async (req, res) => {
+      const id = req.params.id;
+      const { feedback } = req.body;
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          status: "denied",
+          feedback: feedback,
+        },
+      };
+      const result = await allDataCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
+
     // selected Classes
     app.post("/selectedclass", async (req, res) => {
       const selectedClass = req.body;
@@ -205,7 +234,7 @@ async function run() {
     });
 
     //  delete Class from Selected class page
-    app.delete("/selectedmyclass/:id",verifyJWT, async (req, res) => {
+    app.delete("/selectedmyclass/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await selectedClassCollection.deleteOne(query);
