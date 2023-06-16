@@ -51,6 +51,7 @@ async function run() {
     const usersCollection = client.db("craftedShotsDb").collection("users");
     const allDataCollection = client.db("craftedShotsDb").collection("alldata");
     const reviewCollection = client.db("craftedShotsDb").collection("reviews");
+    const eventsCollection = client.db("craftedShotsDb").collection("events");
     const paymentCollection = client
       .db("craftedShotsDb")
       .collection("payments");
@@ -254,8 +255,13 @@ async function run() {
       const result = await reviewCollection.find().toArray();
       res.send(result);
     });
+    // for events
+    app.get("/events", async (req, res) => {
+      const result = await eventsCollection.find().toArray();
+      res.send(result);
+    });
 
-    // 
+    //
     app.post("/create-payment-intent", verifyJWT, async (req, res) => {
       const { courseFee } = req.body;
       const amount = parseInt(courseFee * 100);
